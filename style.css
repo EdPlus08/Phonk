@@ -36,14 +36,6 @@ body::before {
     pointer-events: none;
 }
 
-/* Apagar video en móvil si quieres
-@media (max-width: 600px) {
-    #bg-video {
-        display: none;
-    }
-}
-*/
-
 /* Fondos brillantes laterales */
 .bg-shape {
     position: fixed;
@@ -204,64 +196,16 @@ h1 {
     box-shadow: 0 12px 22px rgba(0, 0, 0, 0.5);
 }
 
-/* ocultar controles nativos del audio */
-.song-card audio {
-    display: none;
-}
-
 .song-title {
     margin: 0;
     font-size: 15px;
     font-weight: 600;
 }
 
-/* =========================
-   PLAYER CUSTOM + WAVEFORM
-   ========================= */
-
-.custom-player {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background: rgba(255, 255, 255, 0.02);
-    border-radius: 999px;
-    padding: 6px 10px;
-    margin-top: 6px;
-}
-
-.play-btn {
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    border: none;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: 13px;
-    cursor: pointer;
-    background: linear-gradient(135deg, #ff6600, #ff1fa4);
-    color: white;
-}
-
-.time-label {
-    font-size: 11px;
-    opacity: 0.8;
-    min-width: 70px;
-}
-
-/* Contenedor de la onda (reemplaza la barra) */
-.wave-container {
-    flex: 1;
-    height: 28px;
-    border-radius: 999px;
-    overflow: hidden;
-    background: rgba(255, 255, 255, 0.04);
-}
-
-.wave-canvas {
+/* Reproductor nativo ocupando todo el ancho */
+.song-card audio {
     width: 100%;
-    height: 100%;
-    display: block;
+    margin-top: 8px;
 }
 
 /* =========================
@@ -377,6 +321,8 @@ footer {
         padding: 16px 18px;
     }
 }
+
+
 
 
 
