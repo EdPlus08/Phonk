@@ -5,6 +5,7 @@ const API = `https://api.github.com/repos/${USER}/${REPO}/contents/audios`;
 
 let allSongs = []; // aquí guardamos todas las canciones
 
+// Cargar canciones desde GitHub
 async function loadSongs() {
     const container = document.getElementById("song-list");
     const countSpan = document.getElementById("song-count");
@@ -32,6 +33,7 @@ async function loadSongs() {
     }
 }
 
+// Pintar la lista de canciones en la página
 function renderSongs(list) {
     const container = document.getElementById("song-list");
     container.innerHTML = "";
@@ -39,7 +41,6 @@ function renderSongs(list) {
     if (!list || list.length === 0) {
         container.innerHTML = "No se encontraron canciones.";
         return;
-        
     }
 
     list.forEach(file => {
@@ -49,26 +50,23 @@ function renderSongs(list) {
         const name = file.name.replace(/\.[^/.]+$/, ""); // quitamos .mp3/.wav
 
         card.innerHTML = `
-    <p class="song-title">${name}</p>
-    <audio controls src="${file.download_url}"></audio>
+            <p class="song-title">${name}</p>
+            <audio controls src="${file.download_url}"></audio>
 
-    <!-- Barra de progreso personalizada -->
-    <div class="progress-container">
-        <div class="progress-fill"></div>
-    </div>
+            <div class="progress-container">
+                <div class="progress-fill"></div>
+            </div>
 
-    <a href="${file.download_url}" download>
-        <button>Descargar</button>
-    </a>
-`;
-
+            <a href="${file.download_url}" download>
+                <button>Descargar</button>
+            </a>
+        `;
 
         container.appendChild(card);
     });
-        // al final de renderSongs
-    setupProgressBars();
-}
 
+    // configurar barras de progreso para los audios recién creados
+    setupProgressBars();
 }
 
 // Búsqueda en vivo
@@ -90,9 +88,7 @@ function setupSearch() {
     });
 }
 
-loadSongs();
-setupSearch();
-
+// Barra de progreso personalizada por cada canción
 function setupProgressBars() {
     const cards = document.querySelectorAll(".song-card");
 
@@ -110,7 +106,7 @@ function setupProgressBars() {
             fill.style.width = `${percent}%`;
         });
 
-        // Permitir hacer click en la barra para adelantar/retroceder
+        // Click en la barra para adelantar/retroceder
         bar.addEventListener("click", (e) => {
             const rect = bar.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
@@ -121,6 +117,11 @@ function setupProgressBars() {
         });
     });
 }
+
+// Inicializar todo
+loadSongs();
+setupSearch();
+
 
 
 
