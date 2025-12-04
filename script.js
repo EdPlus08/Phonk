@@ -3,7 +3,15 @@ const REPO = "Phonk";
 
 const API = `https://api.github.com/repos/${USER}/${REPO}/contents/audios`;
 
-let allSongs = []; // aquí guardamos todas las canciones
+let allSongs = []; // canciones del repo
+
+// Web Audio API
+let audioCtx = null;
+let analyser = null;
+let dataArray = null;
+let animationId = null;
+let currentSource = null;
+let currentCanvas = null;
 
 // Cargar canciones desde GitHub
 async function loadSongs() {
@@ -15,7 +23,7 @@ async function loadSongs() {
         const res = await fetch(API);
         const files = await res.json();
 
-        // Guardamos solo mp3 / wav
+        // Solo mp3 / wav
         allSongs = files.filter(file =>
             file.name.toLowerCase().endsWith(".mp3") ||
             file.name.toLowerCase().endsWith(".wav")
@@ -26,14 +34,13 @@ async function loadSongs() {
         if (countSpan) {
             countSpan.textContent = `${allSongs.length} tema${allSongs.length === 1 ? "" : "s"}`;
         }
-
     } catch (e) {
         console.error(e);
         container.innerHTML = "Error al cargar canciones.";
     }
 }
 
-// Pintar la lista de canciones en la página
+// Pintar lista
 function renderSongs(list) {
     const container = document.getElementById("song-list");
     container.innerHTML = "";
@@ -47,14 +54,14 @@ function renderSongs(list) {
         const card = document.createElement("div");
         card.className = "song-card";
 
-        const name = file.name.replace(/\.[^/.]+$/, ""); // quitamos .mp3/.wav
+        const name = file.name.replace(/\.[^/.]+$/, ""); // sin .mp3
 
         card.innerHTML = `
             <p class="song-title">${name}</p>
             <audio controls src="${file.download_url}"></audio>
 
-            <div class="progress-container">
-                <div class="progress-fill"></div>
+            <div class="wave-container">
+                <canvas class="wave-canvas"></canvas>
             </div>
 
             <a href="${file.download_url}" download>
@@ -65,8 +72,8 @@ function renderSongs(list) {
         container.appendChild(card);
     });
 
-    // configurar barras de progreso para los audios recién creados
-    setupProgressBars();
+    setupSearchHandlers();     // mantiene búsqueda
+    setupVisualizerHandlers(); // conecta ondas a los audios
 }
 
 // Búsqueda en vivo
@@ -88,39 +95,122 @@ function setupSearch() {
     });
 }
 
-// Barra de progreso personalizada por cada canción
-function setupProgressBars() {
+// Como renderSongs vuelve a pintar, necesitamos re-vincular el input cada vez
+function setupSearchHandlers() {
+    // Nada extra por ahora, dejamos aquí por si luego quieres más lógica
+}
+
+// Configurar visualizer por cada audio
+function setupVisualizerHandlers() {
     const cards = document.querySelectorAll(".song-card");
 
     cards.forEach(card => {
         const audio = card.querySelector("audio");
-        const fill = card.querySelector(".progress-fill");
-        const bar = card.querySelector(".progress-container");
+        const canvas = card.querySelector(".wave-canvas");
 
-        if (!audio || !fill || !bar) return;
+        if (!audio || !canvas) return;
 
-        // Actualizar barra mientras avanza la canción
-        audio.addEventListener("timeupdate", () => {
-            if (!audio.duration) return;
-            const percent = (audio.currentTime / audio.duration) * 100;
-            fill.style.width = `${percent}%`;
-        });
+        // Ajustar tamaño del canvas al tamaño real en pantalla
+        const resizeCanvas = () => {
+            canvas.width = canvas.clientWidth;
+            canvas.height = canvas.clientHeight;
+        };
+        resizeCanvas();
+        window.addEventListener("resize", resizeCanvas);
 
-        // Click en la barra para adelantar/retroceder
-        bar.addEventListener("click", (e) => {
-            const rect = bar.getBoundingClientRect();
-            const clickX = e.clientX - rect.left;
-            const percent = clickX / rect.width;
-            if (!isNaN(audio.duration)) {
-                audio.currentTime = percent * audio.duration;
-            }
+        // Cuando empiece a sonar este audio, conectamos el analizador
+        audio.addEventListener("play", () => {
+            startVisualizer(audio, canvas);
+
+            // Pausar otros audios
+            document.querySelectorAll("audio").forEach(a => {
+                if (a !== audio) a.pause();
+            });
         });
     });
 }
 
-// Inicializar todo
+// Iniciar visualizer para un audio concreto
+function startVisualizer(audio, canvas) {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 1024;
+        const bufferLength = analyser.frequencyBinCount;
+        dataArray = new Uint8Array(bufferLength);
+    }
+
+    // Cancelar animación anterior
+    if (animationId) {
+        cancelAnimationFrame(animationId);
+    }
+
+    // Desconectar fuente anterior
+    if (currentSource) {
+        try {
+            currentSource.disconnect();
+        } catch (e) {
+            console.warn(e);
+        }
+    }
+
+    // Crear nueva fuente
+    currentSource = audioCtx.createMediaElementSource(audio);
+    currentSource.connect(analyser);
+    analyser.connect(audioCtx.destination);
+
+    currentCanvas = canvas;
+    drawWave();
+}
+
+// Dibujar waveform en tiempo real
+function drawWave() {
+    if (!currentCanvas || !analyser) return;
+
+    const ctx = currentCanvas.getContext("2d");
+    const width = currentCanvas.width;
+    const height = currentCanvas.height;
+
+    analyser.getByteTimeDomainData(dataArray);
+
+    // Color dinámico tipo RGB/HSL
+    let avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+    let hue = (avg / 255) * 360; // 0–360
+    const strokeColor = `hsl(${hue}, 80%, 65%)`;
+
+    ctx.clearRect(0, 0, width, height);
+
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = strokeColor;
+    ctx.beginPath();
+
+    const sliceWidth = width / dataArray.length;
+    let x = 0;
+
+    for (let i = 0; i < dataArray.length; i++) {
+        const v = dataArray[i] / 128.0; // 0–2
+        const y = (v * height) / 2;
+
+        if (i === 0) {
+            ctx.moveTo(x, y);
+        } else {
+            ctx.lineTo(x, y);
+        }
+
+        x += sliceWidth;
+    }
+
+    ctx.lineTo(width, height / 2);
+    ctx.stroke();
+
+    animationId = requestAnimationFrame(drawWave);
+}
+
+// Inicializar
 loadSongs();
 setupSearch();
+
+
 
 
 
