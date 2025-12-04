@@ -4,17 +4,9 @@ const REPO = "Phonk";
 const API = `https://api.github.com/repos/${USER}/${REPO}/contents/audios`;
 
 let allSongs = []; // canciones del repo
-
-// Web Audio API globals
-let audioCtx = null;
-let analyser = null;
-let dataArray = null;
-let animationId = null;
-let currentAudio = null;
+let currentAnimationId = null;
 let currentCanvas = null;
-
-// Mapa para no recrear la fuente muchas veces
-const sourceMap = new WeakMap();
+let currentAudio = null;
 
 // ---------- Utilidades de tiempo ----------
 function formatTime(seconds) {
@@ -109,7 +101,7 @@ function setupSearch() {
     });
 }
 
-// ---------- Player + visualizer ----------
+// ---------- Player + waveform ----------
 function setupPlayers() {
     const cards = document.querySelectorAll(".song-card");
 
@@ -121,7 +113,7 @@ function setupPlayers() {
 
         if (!audio || !playBtn || !timeLabel || !canvas) return;
 
-        // Ajustar canvas
+        // Ajustar tamaño del canvas
         const resizeCanvas = () => {
             canvas.width = canvas.clientWidth;
             canvas.height = canvas.clientHeight;
@@ -129,7 +121,7 @@ function setupPlayers() {
         resizeCanvas();
         window.addEventListener("resize", resizeCanvas);
 
-        // Actualizar duración cuando se carga metadata
+        // Duración cuando se carga metadata
         audio.addEventListener("loadedmetadata", () => {
             timeLabel.textContent = `0:00 / ${formatTime(audio.duration)}`;
         });
@@ -145,7 +137,6 @@ function setupPlayers() {
             document.querySelectorAll(".song-card audio").forEach(a => {
                 if (a !== audio) {
                     a.pause();
-                    a.currentTime = a.currentTime; // forzar evento
                 }
             });
             document.querySelectorAll(".play-btn").forEach(btn => {
@@ -153,96 +144,98 @@ function setupPlayers() {
             });
 
             if (audio.paused) {
-                await audio.play();
-                playBtn.textContent = "⏸";
-                startVisualizer(audio, canvas);
+                try {
+                    await audio.play();
+                    playBtn.textContent = "⏸";
+                    startFakeVisualizer(audio, canvas);
+                } catch (err) {
+                    console.error(err);
+                }
             } else {
                 audio.pause();
                 playBtn.textContent = "▶";
-                stopVisualizer();
+                stopFakeVisualizer();
             }
         });
     });
 }
 
-function initAudioGraph() {
-    if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 1024;
-        const bufferLength = analyser.frequencyBinCount;
-        dataArray = new Uint8Array(bufferLength);
-        analyser.connect(audioCtx.destination);
-    }
-}
-
-function startVisualizer(audio, canvas) {
-    initAudioGraph();
-
-    // cancelar animación anterior
-    if (animationId) cancelAnimationFrame(animationId);
+// ---------- Waveform "fake" sincronizada con el tiempo ----------
+function startFakeVisualizer(audio, canvas) {
+    // parar animación anterior
+    stopFakeVisualizer();
 
     currentAudio = audio;
     currentCanvas = canvas;
 
-    let source = sourceMap.get(audio);
-    if (!source) {
-        source = audioCtx.createMediaElementSource(audio);
-        source.connect(analyser);
-        sourceMap.set(audio, source);
+    function draw() {
+        if (!currentAudio || currentAudio.paused || currentAudio.ended) {
+            stopFakeVisualizer();
+            return;
+        }
+
+        const ctx = currentCanvas.getContext("2d");
+        const width = currentCanvas.width;
+        const height = currentCanvas.height;
+
+        ctx.clearRect(0, 0, width, height);
+
+        const now = currentAudio.currentTime || 0;
+        const duration = currentAudio.duration || 1;
+        const progress = now / duration;
+
+        // Color RGB suave basado en el tiempo
+        const hue = (now * 40) % 360;
+        ctx.strokeStyle = `hsl(${hue}, 80%, 65%)`;
+        ctx.lineWidth = 2;
+
+        ctx.beginPath();
+
+        const segments = 80;
+        const sliceWidth = width / segments;
+        let x = 0;
+
+        for (let i = 0; i <= segments; i++) {
+            const t = (i / segments) * Math.PI * 2;
+
+            // base de onda
+            let ampBase = Math.sin(t * 2 + now * 3);
+
+            // un poquito de "golpe" al ritmo del progreso
+            const pulse = Math.sin(progress * Math.PI * 4 + i * 0.3);
+
+            const amplitude = (ampBase * 0.4 + pulse * 0.2) * height * 0.4;
+
+            const y = height / 2 + amplitude;
+
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+
+            x += sliceWidth;
+        }
+
+        ctx.stroke();
+
+        currentAnimationId = requestAnimationFrame(draw);
     }
 
-    drawWave();
+    currentAnimationId = requestAnimationFrame(draw);
 }
 
-function stopVisualizer() {
-    if (animationId) cancelAnimationFrame(animationId);
-    animationId = null;
-}
-
-// Dibuja la onda (waveform) en el canvas actual
-function drawWave() {
-    if (!currentCanvas || !analyser) return;
-
-    const ctx = currentCanvas.getContext("2d");
-    const width = currentCanvas.width;
-    const height = currentCanvas.height;
-
-    analyser.getByteTimeDomainData(dataArray);
-
-    // Color RGB dinámico (HSL)
-    let avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
-    let hue = (avg / 255) * 360;
-    const strokeColor = `hsl(${hue}, 80%, 65%)`;
-
-    ctx.clearRect(0, 0, width, height);
-
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = strokeColor;
-    ctx.beginPath();
-
-    const sliceWidth = width / dataArray.length;
-    let x = 0;
-
-    for (let i = 0; i < dataArray.length; i++) {
-        const v = dataArray[i] / 128.0; // 0–2
-        const y = (v * height) / 2;
-
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-
-        x += sliceWidth;
+function stopFakeVisualizer() {
+    if (currentAnimationId) {
+        cancelAnimationFrame(currentAnimationId);
+        currentAnimationId = null;
     }
-
-    ctx.lineTo(width, height / 2);
-    ctx.stroke();
-
-    animationId = requestAnimationFrame(drawWave);
+    currentAudio = null;
+    currentCanvas = null;
 }
 
 // ---------- Init ----------
 loadSongs();
 setupSearch();
+
+
 
 
 
