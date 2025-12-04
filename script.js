@@ -1,7 +1,8 @@
 const USER = "TU_USUARIO";
 const REPO = "TU_REPO";
 
-const API = `https://api.github.com/repos/${USER}/${REPO}/contents/audios`;
+const API = `https://api.github.com/repos/EdPlus08/Phonk/contents/audios
+`;
 
 async function loadSongs() {
     const container = document.getElementById("song-list");
@@ -43,4 +44,5 @@ async function loadSongs() {
 }
 
 loadSongs();
+
 
