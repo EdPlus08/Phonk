@@ -152,6 +152,23 @@ h1 {
     border: 1px solid rgba(255, 255, 255, 0.04);
     box-shadow: 0 12px 22px rgba(0, 0, 0, 0.5);
 }
+.progress-container {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    margin-top: 6px;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.progress-fill {
+    height: 100%;
+    width: 0;
+    background: linear-gradient(90deg, #ff6600, #ff1fa4, #00d9ff);
+    transition: width 0.08s linear;
+}
+
 
 .song-title {
     margin: 0;
@@ -283,5 +300,6 @@ footer {
     z-index: -3;              /* detrás de todo */
     filter: brightness(0.35); /* oscurecer un poco para que se lea el texto */
 }
+
 
 
