@@ -39,6 +39,7 @@ function renderSongs(list) {
     if (!list || list.length === 0) {
         container.innerHTML = "No se encontraron canciones.";
         return;
+        
     }
 
     list.forEach(file => {
@@ -48,16 +49,55 @@ function renderSongs(list) {
         const name = file.name.replace(/\.[^/.]+$/, ""); // quitamos .mp3/.wav
 
         card.innerHTML = `
-            <p class="song-title">${name}</p>
-            <audio controls src="${file.download_url}"></audio>
-            <br>
-            <a href="${file.download_url}" download>
-                <button>Descargar</button>
-            </a>
-        `;
+    <p class="song-title">${name}</p>
+    <audio controls src="${file.download_url}"></audio>
+
+    <!-- Barra de progreso personalizada -->
+    <div class="progress-container">
+        <div class="progress-fill"></div>
+    </div>
+
+    <a href="${file.download_url}" download>
+        <button>Descargar</button>
+    </a>
+`;
+
 
         container.appendChild(card);
     });
+        // al final de renderSongs
+    setupProgressBars();
+}
+
+function setupProgressBars() {
+    const cards = document.querySelectorAll(".song-card");
+
+    cards.forEach(card => {
+        const audio = card.querySelector("audio");
+        const fill = card.querySelector(".progress-fill");
+        const bar = card.querySelector(".progress-container");
+
+        if (!audio || !fill || !bar) return;
+
+        // Actualizar barra mientras avanza la canción
+        audio.addEventListener("timeupdate", () => {
+            if (!audio.duration) return;
+            const percent = (audio.currentTime / audio.duration) * 100;
+            fill.style.width = `${percent}%`;
+        });
+
+        // Permitir hacer click en la barra para adelantar/retroceder
+        bar.addEventListener("click", (e) => {
+            const rect = bar.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const percent = clickX / rect.width;
+            if (!isNaN(audio.duration)) {
+                audio.currentTime = percent * audio.duration;
+            }
+        });
+    });
+}
+
 }
 
 // Búsqueda en vivo
@@ -81,5 +121,7 @@ function setupSearch() {
 
 loadSongs();
 setupSearch();
+
+
 
 
