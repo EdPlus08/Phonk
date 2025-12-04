@@ -5,15 +5,26 @@ const API = `https://api.github.com/repos/${USER}/${REPO}/contents/audios`;
 
 let allSongs = []; // canciones del repo
 
-// Web Audio API
+// Web Audio API globals
 let audioCtx = null;
 let analyser = null;
 let dataArray = null;
 let animationId = null;
-let currentSource = null;
+let currentAudio = null;
 let currentCanvas = null;
 
-// Cargar canciones desde GitHub
+// Mapa para no recrear la fuente muchas veces
+const sourceMap = new WeakMap();
+
+// ---------- Utilidades de tiempo ----------
+function formatTime(seconds) {
+    if (!seconds || isNaN(seconds)) return "0:00";
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60).toString().padStart(2, "0");
+    return `${m}:${s}`;
+}
+
+// ---------- Carga de canciones ----------
 async function loadSongs() {
     const container = document.getElementById("song-list");
     const countSpan = document.getElementById("song-count");
@@ -23,7 +34,6 @@ async function loadSongs() {
         const res = await fetch(API);
         const files = await res.json();
 
-        // Solo mp3 / wav
         allSongs = files.filter(file =>
             file.name.toLowerCase().endsWith(".mp3") ||
             file.name.toLowerCase().endsWith(".wav")
@@ -40,7 +50,7 @@ async function loadSongs() {
     }
 }
 
-// Pintar lista
+// ---------- Render de lista ----------
 function renderSongs(list) {
     const container = document.getElementById("song-list");
     container.innerHTML = "";
@@ -54,15 +64,20 @@ function renderSongs(list) {
         const card = document.createElement("div");
         card.className = "song-card";
 
-        const name = file.name.replace(/\.[^/.]+$/, ""); // sin .mp3
+        const name = file.name.replace(/\.[^/.]+$/, ""); // quitar extensión
 
         card.innerHTML = `
             <p class="song-title">${name}</p>
-            <audio controls src="${file.download_url}"></audio>
 
-            <div class="wave-container">
-                <canvas class="wave-canvas"></canvas>
+            <div class="custom-player">
+                <button class="play-btn">▶</button>
+                <span class="time-label">0:00 / 0:00</span>
+                <div class="wave-container">
+                    <canvas class="wave-canvas"></canvas>
+                </div>
             </div>
+
+            <audio src="${file.download_url}"></audio>
 
             <a href="${file.download_url}" download>
                 <button>Descargar</button>
@@ -72,11 +87,10 @@ function renderSongs(list) {
         container.appendChild(card);
     });
 
-    setupSearchHandlers();     // mantiene búsqueda
-    setupVisualizerHandlers(); // conecta ondas a los audios
+    setupPlayers();
 }
 
-// Búsqueda en vivo
+// ---------- Búsqueda ----------
 function setupSearch() {
     const searchInput = document.getElementById("search");
     if (!searchInput) return;
@@ -95,22 +109,19 @@ function setupSearch() {
     });
 }
 
-// Como renderSongs vuelve a pintar, necesitamos re-vincular el input cada vez
-function setupSearchHandlers() {
-    // Nada extra por ahora, dejamos aquí por si luego quieres más lógica
-}
-
-// Configurar visualizer por cada audio
-function setupVisualizerHandlers() {
+// ---------- Player + visualizer ----------
+function setupPlayers() {
     const cards = document.querySelectorAll(".song-card");
 
     cards.forEach(card => {
         const audio = card.querySelector("audio");
+        const playBtn = card.querySelector(".play-btn");
+        const timeLabel = card.querySelector(".time-label");
         const canvas = card.querySelector(".wave-canvas");
 
-        if (!audio || !canvas) return;
+        if (!audio || !playBtn || !timeLabel || !canvas) return;
 
-        // Ajustar tamaño del canvas al tamaño real en pantalla
+        // Ajustar canvas
         const resizeCanvas = () => {
             canvas.width = canvas.clientWidth;
             canvas.height = canvas.clientHeight;
@@ -118,52 +129,78 @@ function setupVisualizerHandlers() {
         resizeCanvas();
         window.addEventListener("resize", resizeCanvas);
 
-        // Cuando empiece a sonar este audio, conectamos el analizador
-        audio.addEventListener("play", () => {
-            startVisualizer(audio, canvas);
+        // Actualizar duración cuando se carga metadata
+        audio.addEventListener("loadedmetadata", () => {
+            timeLabel.textContent = `0:00 / ${formatTime(audio.duration)}`;
+        });
 
-            // Pausar otros audios
-            document.querySelectorAll("audio").forEach(a => {
-                if (a !== audio) a.pause();
+        // Actualizar tiempo actual
+        audio.addEventListener("timeupdate", () => {
+            timeLabel.textContent = `${formatTime(audio.currentTime)} / ${formatTime(audio.duration)}`;
+        });
+
+        // Botón play/pause
+        playBtn.addEventListener("click", async () => {
+            // Pausar todos los demás audios
+            document.querySelectorAll(".song-card audio").forEach(a => {
+                if (a !== audio) {
+                    a.pause();
+                    a.currentTime = a.currentTime; // forzar evento
+                }
             });
+            document.querySelectorAll(".play-btn").forEach(btn => {
+                if (btn !== playBtn) btn.textContent = "▶";
+            });
+
+            if (audio.paused) {
+                await audio.play();
+                playBtn.textContent = "⏸";
+                startVisualizer(audio, canvas);
+            } else {
+                audio.pause();
+                playBtn.textContent = "▶";
+                stopVisualizer();
+            }
         });
     });
 }
 
-// Iniciar visualizer para un audio concreto
-function startVisualizer(audio, canvas) {
+function initAudioGraph() {
     if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         analyser = audioCtx.createAnalyser();
         analyser.fftSize = 1024;
         const bufferLength = analyser.frequencyBinCount;
         dataArray = new Uint8Array(bufferLength);
+        analyser.connect(audioCtx.destination);
     }
+}
 
-    // Cancelar animación anterior
-    if (animationId) {
-        cancelAnimationFrame(animationId);
-    }
+function startVisualizer(audio, canvas) {
+    initAudioGraph();
 
-    // Desconectar fuente anterior
-    if (currentSource) {
-        try {
-            currentSource.disconnect();
-        } catch (e) {
-            console.warn(e);
-        }
-    }
+    // cancelar animación anterior
+    if (animationId) cancelAnimationFrame(animationId);
 
-    // Crear nueva fuente
-    currentSource = audioCtx.createMediaElementSource(audio);
-    currentSource.connect(analyser);
-    analyser.connect(audioCtx.destination);
-
+    currentAudio = audio;
     currentCanvas = canvas;
+
+    let source = sourceMap.get(audio);
+    if (!source) {
+        source = audioCtx.createMediaElementSource(audio);
+        source.connect(analyser);
+        sourceMap.set(audio, source);
+    }
+
     drawWave();
 }
 
-// Dibujar waveform en tiempo real
+function stopVisualizer() {
+    if (animationId) cancelAnimationFrame(animationId);
+    animationId = null;
+}
+
+// Dibuja la onda (waveform) en el canvas actual
 function drawWave() {
     if (!currentCanvas || !analyser) return;
 
@@ -173,9 +210,9 @@ function drawWave() {
 
     analyser.getByteTimeDomainData(dataArray);
 
-    // Color dinámico tipo RGB/HSL
+    // Color RGB dinámico (HSL)
     let avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
-    let hue = (avg / 255) * 360; // 0–360
+    let hue = (avg / 255) * 360;
     const strokeColor = `hsl(${hue}, 80%, 65%)`;
 
     ctx.clearRect(0, 0, width, height);
@@ -191,11 +228,8 @@ function drawWave() {
         const v = dataArray[i] / 128.0; // 0–2
         const y = (v * height) / 2;
 
-        if (i === 0) {
-            ctx.moveTo(x, y);
-        } else {
-            ctx.lineTo(x, y);
-        }
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
 
         x += sliceWidth;
     }
@@ -206,9 +240,10 @@ function drawWave() {
     animationId = requestAnimationFrame(drawWave);
 }
 
-// Inicializar
+// ---------- Init ----------
 loadSongs();
 setupSearch();
+
 
 
 
