@@ -1,4 +1,7 @@
-/* Fondo general */
+/* =========================
+   FONDO GENERAL + VIDEO
+   ========================= */
+
 body {
     margin: 0;
     background: radial-gradient(circle at top, #151724 0, #05060a 55%);
@@ -9,7 +12,39 @@ body {
     overflow-x: hidden;
 }
 
-/* Fondos brillantes a los costados */
+/* Video de fondo */
+#bg-video {
+    position: fixed;
+    top: 0;
+    left: 0;
+    min-width: 100%;
+    min-height: 100%;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: -3;
+    filter: brightness(0.35);
+}
+
+/* Capa oscura encima del video */
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle at top, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.85));
+    z-index: -2;
+    pointer-events: none;
+}
+
+/* Apagar video en móvil si quieres
+@media (max-width: 600px) {
+    #bg-video {
+        display: none;
+    }
+}
+*/
+
+/* Fondos brillantes laterales */
 .bg-shape {
     position: fixed;
     top: 10%;
@@ -31,7 +66,10 @@ body {
     background: radial-gradient(circle, #00d9ff, #7c3bff 60%, transparent 70%);
 }
 
-/* Header */
+/* =========================
+   HEADER
+   ========================= */
+
 header {
     padding: 20px 8%;
     display: flex;
@@ -61,7 +99,10 @@ h1 {
     opacity: 0.7;
 }
 
-/* Contenedor general */
+/* =========================
+   LAYOUT GENERAL
+   ========================= */
+
 .container {
     display: flex;
     justify-content: center;
@@ -69,7 +110,6 @@ h1 {
     padding: 0 16px 40px;
 }
 
-/* Layout de 2 columnas */
 .layout {
     width: 100%;
     max-width: 1040px;
@@ -78,7 +118,10 @@ h1 {
     align-items: flex-start;
 }
 
-/* Card principal (lista de temas) */
+/* =========================
+   CARD PRINCIPAL (TEMAS)
+   ========================= */
+
 .list-card {
     background: radial-gradient(circle at top left, #1b2030 0, #0b0f1c 55%);
     border-radius: 24px;
@@ -89,7 +132,8 @@ h1 {
         0 0 0 1px rgba(255, 255, 255, 0.02);
 }
 
-/* Panel lateral de virales */
+/* PANEL LATERAL: VIRALES */
+
 .viral-card {
     background: radial-gradient(circle at top, #191d2a 0, #080b14 55%);
     border-radius: 24px;
@@ -100,7 +144,8 @@ h1 {
         0 0 0 1px rgba(255, 255, 255, 0.03);
 }
 
-/* Título + contador */
+/* Header de cards */
+
 .card-header {
     display: flex;
     justify-content: space-between;
@@ -121,7 +166,10 @@ h1 {
     border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-/* Barra de búsqueda */
+/* =========================
+   BUSCADOR
+   ========================= */
+
 #search {
     width: 100%;
     padding: 10px 12px;
@@ -143,7 +191,10 @@ h1 {
     box-shadow: 0 0 0 1px rgba(255, 106, 0, 0.4);
 }
 
-/* Lista principal de canciones */
+/* =========================
+   LISTA DE CANCIONES
+   ========================= */
+
 .song-card {
     background: rgba(12, 16, 30, 0.96);
     padding: 14px 14px 16px;
@@ -153,18 +204,70 @@ h1 {
     box-shadow: 0 12px 22px rgba(0, 0, 0, 0.5);
 }
 
+/* ocultar controles nativos del audio */
+.song-card audio {
+    display: none;
+}
+
 .song-title {
     margin: 0;
     font-size: 15px;
     font-weight: 600;
 }
 
-audio {
-    width: 100%;
-    margin-top: 8px;
+/* =========================
+   PLAYER CUSTOM + WAVEFORM
+   ========================= */
+
+.custom-player {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 999px;
+    padding: 6px 10px;
+    margin-top: 6px;
 }
 
-/* Botón de descarga */
+.play-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 13px;
+    cursor: pointer;
+    background: linear-gradient(135deg, #ff6600, #ff1fa4);
+    color: white;
+}
+
+.time-label {
+    font-size: 11px;
+    opacity: 0.8;
+    min-width: 70px;
+}
+
+/* Contenedor de la onda (reemplaza la barra) */
+.wave-container {
+    flex: 1;
+    height: 28px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.wave-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* =========================
+   BOTONES / FOOTER
+   ========================= */
+
 button {
     background: linear-gradient(45deg, #ff6600, #ff1fa4);
     padding: 7px 16px;
@@ -180,7 +283,17 @@ button:hover {
     filter: brightness(1.05);
 }
 
-/* --- Panel virales --- */
+footer {
+    text-align: center;
+    opacity: 0.6;
+    padding-bottom: 20px;
+    font-size: 13px;
+}
+
+/* =========================
+   PANEL VIRALES
+   ========================= */
+
 .viral-sub {
     font-size: 12px;
     opacity: 0.7;
@@ -240,22 +353,17 @@ button:hover {
     margin-top: 6px;
 }
 
-/* Footer */
-footer {
-    text-align: center;
-    opacity: 0.6;
-    padding-bottom: 20px;
-    font-size: 13px;
-}
+/* =========================
+   RESPONSIVE
+   ========================= */
 
-/* Responsive */
 @media (max-width: 860px) {
     .layout {
         flex-direction: column;
     }
 
     .viral-card {
-        order: -1; /* que los virales queden arriba en móvil */
+        order: -1; /* virales arriba en móvil */
     }
 }
 
@@ -270,34 +378,6 @@ footer {
     }
 }
 
-/* Video de fondo */
-#bg-video {
-    position: fixed;
-    top: 0;
-    left: 0;
-    min-width: 100%;
-    min-height: 100%;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    z-index: -3;              /* detrás de todo */
-    filter: brightness(0.35); /* oscurecer un poco para que se lea el texto */
-}
-
-.wave-container {
-    width: 100%;
-    height: 40px;
-    background: rgba(255, 255, 255, 0.03);
-    border-radius: 10px;
-    margin-top: 8px;
-    overflow: hidden;
-}
-
-.wave-canvas {
-    width: 100%;
-    height: 100%;
-    display: block;
-}
 
 
 
