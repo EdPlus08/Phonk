@@ -270,4 +270,18 @@ footer {
     }
 }
 
+/* Video de fondo */
+#bg-video {
+    position: fixed;
+    top: 0;
+    left: 0;
+    min-width: 100%;
+    min-height: 100%;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: -3;              /* detrás de todo */
+    filter: brightness(0.35); /* oscurecer un poco para que se lea el texto */
+}
+
 
