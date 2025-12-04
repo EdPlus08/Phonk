@@ -69,6 +69,30 @@ function renderSongs(list) {
     setupProgressBars();
 }
 
+}
+
+// Búsqueda en vivo
+function setupSearch() {
+    const searchInput = document.getElementById("search");
+    if (!searchInput) return;
+
+    searchInput.addEventListener("input", () => {
+        const term = searchInput.value.trim().toLowerCase();
+
+        if (term === "") {
+            renderSongs(allSongs);
+        } else {
+            const filtered = allSongs.filter(file =>
+                file.name.toLowerCase().includes(term)
+            );
+            renderSongs(filtered);
+        }
+    });
+}
+
+loadSongs();
+setupSearch();
+
 function setupProgressBars() {
     const cards = document.querySelectorAll(".song-card");
 
@@ -97,30 +121,6 @@ function setupProgressBars() {
         });
     });
 }
-
-}
-
-// Búsqueda en vivo
-function setupSearch() {
-    const searchInput = document.getElementById("search");
-    if (!searchInput) return;
-
-    searchInput.addEventListener("input", () => {
-        const term = searchInput.value.trim().toLowerCase();
-
-        if (term === "") {
-            renderSongs(allSongs);
-        } else {
-            const filtered = allSongs.filter(file =>
-                file.name.toLowerCase().includes(term)
-            );
-            renderSongs(filtered);
-        }
-    });
-}
-
-loadSongs();
-setupSearch();
 
 
 
