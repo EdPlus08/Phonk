@@ -7,6 +7,10 @@
 </head>
 <body>
 
+<!-- Fondos decorativos -->
+<div class="bg-shape bg-left"></div>
+<div class="bg-shape bg-right"></div>
+
 <header>
     <div class="logo">PE</div>
     <h1>Phonk EdPlus</h1>
@@ -15,12 +19,22 @@
 <p class="desc">Descarga tu phonk favorito en un solo lugar.</p>
 
 <div class="container">
-
     <div class="list-card">
-        <h2>Temas Subidos</h2>
+        <div class="card-header">
+            <h2>Temas Subidos</h2>
+            <span id="song-count" class="pill">0 temas</span>
+        </div>
+
+        <!-- 🔍 Barra de búsqueda -->
+        <input
+            id="search"
+            type="text"
+            placeholder="Buscar tema..."
+            autocomplete="off"
+        >
+
         <div id="song-list">Cargando canciones...</div>
     </div>
-
 </div>
 
 <footer>
@@ -31,3 +45,5 @@
 
 </body>
 </html>
+
+
