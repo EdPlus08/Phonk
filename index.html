@@ -19,22 +19,76 @@
 <p class="desc">Descarga tu phonk favorito en un solo lugar.</p>
 
 <div class="container">
-    <div class="list-card">
-        <div class="card-header">
-            <h2>Temas Subidos</h2>
-            <span id="song-count" class="pill">0 temas</span>
+
+    <div class="layout">
+        <!-- LISTA PRINCIPAL -->
+        <div class="list-card">
+            <div class="card-header">
+                <h2>Temas subidos</h2>
+                <span id="song-count" class="pill">0 temas</span>
+            </div>
+
+            <!-- 🔍 Barra de búsqueda -->
+            <input
+                id="search"
+                type="text"
+                placeholder="Buscar tema..."
+                autocomplete="off"
+            >
+
+            <div id="song-list">Cargando canciones...</div>
         </div>
 
-        <!-- 🔍 Barra de búsqueda -->
-        <input
-            id="search"
-            type="text"
-            placeholder="Buscar tema..."
-            autocomplete="off"
-        >
+        <!-- PANEL LATERAL: PHONK VIRALES -->
+        <aside class="viral-card">
+            <div class="card-header">
+                <h2>Phonk virales</h2>
+            </div>
 
-        <div id="song-list">Cargando canciones...</div>
+            <p class="viral-sub">Lo más escuchado últimamente en la escena.</p>
+
+            <ul class="viral-list">
+                <li>
+                    <span class="v-rank">1</span>
+                    <div class="v-info">
+                        <p class="v-title">METAMORPHOSIS</p>
+                        <p class="v-artist">INTERWORLD</p>
+                    </div>
+                </li>
+                <li>
+                    <span class="v-rank">2</span>
+                    <div class="v-info">
+                        <p class="v-title">NEON BLADE</p>
+                        <p class="v-artist">MOONDEITY</p>
+                    </div>
+                </li>
+                <li>
+                    <span class="v-rank">3</span>
+                    <div class="v-info">
+                        <p class="v-title">AFTER DARK (Phonk)</p>
+                        <p class="v-artist">Mr.Kitty / Remix</p>
+                    </div>
+                </li>
+                <li>
+                    <span class="v-rank">4</span>
+                    <div class="v-info">
+                        <p class="v-title">RAVE INFERNO</p>
+                        <p class="v-artist">BONES x PHONK</p>
+                    </div>
+                </li>
+                <li>
+                    <span class="v-rank">5</span>
+                    <div class="v-info">
+                        <p class="v-title">TXC STR3ETS</p>
+                        <p class="v-artist">TXC PHONK</p>
+                    </div>
+                </li>
+            </ul>
+
+            <p class="viral-note">Lista solo decorativa por ahora. Más adelante podemos conectarla a una API real. ⚡</p>
+        </aside>
     </div>
+
 </div>
 
 <footer>
@@ -45,5 +99,4 @@
 
 </body>
 </html>
-
 
