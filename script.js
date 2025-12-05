@@ -4,7 +4,12 @@ const REPO = "Phonk";
 const API = `https://api.github.com/repos/${USER}/${REPO}/contents/audios`;
 
 let allSongs = [];
-const waveAnimations = new WeakMap(); // guardar animación por audio
+const waveAnimations = new WeakMap();    // guarda id de animación por audio
+const sourceMap = new WeakMap();         // guarda la fuente de audio por elemento
+
+let audioCtx = null;
+let analyser = null;
+let dataArray = null;
 
 // ---------- Utilidad: formatear tiempo ----------
 function formatTime(seconds) {
@@ -12,6 +17,20 @@ function formatTime(seconds) {
     const m = Math.floor(seconds / 60);
     const s = Math.floor(seconds % 60).toString().padStart(2, "0");
     return `${m}:${s}`;
+}
+
+// ---------- Inicializar AudioContext + Analyser ----------
+function ensureAudioContext() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 512;
+        const bufferLength = analyser.frequencyBinCount;
+        dataArray = new Uint8Array(bufferLength);
+
+        // analyser -> destino
+        analyser.connect(audioCtx.destination);
+    }
 }
 
 // ---------- Cargar canciones desde GitHub ----------
@@ -68,7 +87,8 @@ function renderSongs(list) {
                 </div>
             </div>
 
-            <audio src="${file.download_url}"></audio>
+            <!-- IMPORTANTE: crossorigin para que el analizador pueda leer datos -->
+            <audio src="${file.download_url}" crossorigin="anonymous"></audio>
 
             <a href="${file.download_url}" download>
                 <button>Descargar</button>
@@ -100,7 +120,7 @@ function setupSearch() {
     });
 }
 
-// ---------- Player custom + ondas ----------
+// ---------- Configurar player custom + ondas ----------
 function setupPlayers() {
     const cards = document.querySelectorAll(".song-card");
 
@@ -113,7 +133,7 @@ function setupPlayers() {
 
         if (!audio || !playBtn || !timeLabel || !canvas || !waveContainer) return;
 
-        // Asegurarnos que el canvas encaje en el contenedor
+        // Asegurar tamaño del canvas
         const resizeCanvas = () => {
             canvas.width = waveContainer.clientWidth;
             canvas.height = waveContainer.clientHeight;
@@ -121,19 +141,19 @@ function setupPlayers() {
         resizeCanvas();
         window.addEventListener("resize", resizeCanvas);
 
-        // Actualizar duración cuando carga
+        // Duración cuando carga metadata
         audio.addEventListener("loadedmetadata", () => {
             timeLabel.textContent = `0:00 / ${formatTime(audio.duration)}`;
         });
 
-        // Actualizar tiempo actual (texto)
+        // Actualizar tiempo actual
         audio.addEventListener("timeupdate", () => {
             timeLabel.textContent = `${formatTime(audio.currentTime)} / ${formatTime(audio.duration)}`;
         });
 
-        // Clic en el botón play / pause
+        // Botón play/pause
         playBtn.addEventListener("click", async () => {
-            // Pausar otros audios
+            // Pausar todos los demás
             document.querySelectorAll(".song-card audio").forEach(a => {
                 if (a !== audio) {
                     a.pause();
@@ -144,11 +164,16 @@ function setupPlayers() {
                 if (btn !== playBtn) btn.textContent = "▶";
             });
 
+            ensureAudioContext();
+            if (audioCtx.state === "suspended") {
+                await audioCtx.resume();
+            }
+
             if (audio.paused) {
                 try {
                     await audio.play();
                     playBtn.textContent = "⏸";
-                    startWave(audio, canvas);
+                    startWaveReal(audio, canvas);
                 } catch (err) {
                     console.error(err);
                 }
@@ -159,7 +184,7 @@ function setupPlayers() {
             }
         });
 
-        // Clic en la onda para adelantar/retroceder
+        // Click en la barra para adelantar/retroceder
         waveContainer.addEventListener("click", (e) => {
             const rect = waveContainer.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
@@ -169,7 +194,6 @@ function setupPlayers() {
             }
         });
 
-        // Cuando termine, paramos animación y reseteamos botón
         audio.addEventListener("ended", () => {
             playBtn.textContent = "▶";
             stopWave(audio);
@@ -177,12 +201,22 @@ function setupPlayers() {
     });
 }
 
-// ---------- Onda "fake" RGB sincronizada con el tiempo ----------
-function startWave(audio, canvas) {
-    stopWave(audio); // limpiar si había una anterior
+// ---------- Onda REAL al ritmo del sonido ----------
+function startWaveReal(audio, canvas) {
+    stopWave(audio); // limpiar animación anterior
+
+    ensureAudioContext();
+
+    // crear MediaElementSource UNA sola vez por audio
+    let source = sourceMap.get(audio);
+    if (!source) {
+        source = audioCtx.createMediaElementSource(audio);
+        source.connect(analyser);
+        sourceMap.set(audio, source);
+    }
 
     function draw() {
-        if (audio.paused || audio.ended) {
+        if (!audio || audio.paused || audio.ended) {
             stopWave(audio);
             return;
         }
@@ -191,37 +225,35 @@ function startWave(audio, canvas) {
         const width = canvas.width;
         const height = canvas.height;
 
+        // datos de frecuencia del sonido real
+        analyser.getByteFrequencyData(dataArray);
+
         ctx.clearRect(0, 0, width, height);
 
-        const now = audio.currentTime || 0;
-        const duration = audio.duration || 1;
-        const progress = now / duration;
+        // promedio para color
+        let avg = 0;
+        for (let i = 0; i < dataArray.length; i++) avg += dataArray[i];
+        avg /= dataArray.length;
+        const hue = (avg / 255) * 360;
 
-        // Color RGB suave basado en tiempo
-        const hue = (now * 40) % 360;
-        ctx.strokeStyle = `hsl(hue, 80%, 65%)`.replace("hue", hue.toString());
+        ctx.strokeStyle = `hsl(${hue}, 80%, 65%)`;
         ctx.lineWidth = 2;
 
         ctx.beginPath();
 
-        const segments = 80;
-        const sliceWidth = width / segments;
-        let x = 0;
+        const bars = 80;
+        const step = Math.floor(dataArray.length / bars);
+        const barWidth = width / bars;
 
-        for (let i = 0; i <= segments; i++) {
-            const t = (i / segments) * Math.PI * 2;
+        for (let i = 0; i < bars; i++) {
+            const value = dataArray[i * step] / 255;  // 0–1
+            const barHeight = value * (height * 0.9);
+            const x = i * barWidth;
+            const y = height - barHeight;
 
-            // base de onda + pequeño pulso
-            const base = Math.sin(t * 2 + now * 3);
-            const pulse = Math.sin(progress * Math.PI * 4 + i * 0.3);
-
-            const amplitude = (base * 0.4 + pulse * 0.2) * (height * 0.35);
-            const y = height / 2 + amplitude;
-
+            // dibujar como línea "ondulada"
             if (i === 0) ctx.moveTo(x, y);
             else ctx.lineTo(x, y);
-
-            x += sliceWidth;
         }
 
         ctx.stroke();
@@ -245,6 +277,8 @@ function stopWave(audio) {
 // ---------- Init ----------
 loadSongs();
 setupSearch();
+
+
 
 
 
