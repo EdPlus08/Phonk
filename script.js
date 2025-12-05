@@ -4,9 +4,17 @@ const REPO = "Phonk";
 const API = `https://api.github.com/repos/${USER}/${REPO}/contents/audios`;
 
 let allSongs = [];
-let waveAnimations = new WeakMap(); // para guardar animación por audio
+const waveAnimations = new WeakMap(); // guardar animación por audio
 
-// Cargar canciones desde GitHub
+// ---------- Utilidad: formatear tiempo ----------
+function formatTime(seconds) {
+    if (!seconds || isNaN(seconds)) return "0:00";
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60).toString().padStart(2, "0");
+    return `${m}:${s}`;
+}
+
+// ---------- Cargar canciones desde GitHub ----------
 async function loadSongs() {
     const container = document.getElementById("song-list");
     const countSpan = document.getElementById("song-count");
@@ -33,7 +41,7 @@ async function loadSongs() {
     }
 }
 
-// Pintar lista
+// ---------- Pintar lista ----------
 function renderSongs(list) {
     const container = document.getElementById("song-list");
     container.innerHTML = "";
@@ -51,10 +59,17 @@ function renderSongs(list) {
 
         card.innerHTML = `
             <p class="song-title">${name}</p>
-            <div class="player-wrapper">
-                <audio controls src="${file.download_url}"></audio>
-                <canvas class="wave-overlay"></canvas>
+
+            <div class="custom-player">
+                <button class="play-btn">▶</button>
+                <span class="time-label">0:00 / 0:00</span>
+                <div class="wave-container">
+                    <canvas class="wave-canvas"></canvas>
+                </div>
             </div>
+
+            <audio src="${file.download_url}"></audio>
+
             <a href="${file.download_url}" download>
                 <button>Descargar</button>
             </a>
@@ -63,10 +78,10 @@ function renderSongs(list) {
         container.appendChild(card);
     });
 
-    setupVisualWaves();
+    setupPlayers();
 }
 
-// Búsqueda en vivo
+// ---------- Búsqueda ----------
 function setupSearch() {
     const searchInput = document.getElementById("search");
     if (!searchInput) return;
@@ -85,48 +100,86 @@ function setupSearch() {
     });
 }
 
-// Configurar ondas para cada audio
-function setupVisualWaves() {
-    const wrappers = document.querySelectorAll(".player-wrapper");
+// ---------- Player custom + ondas ----------
+function setupPlayers() {
+    const cards = document.querySelectorAll(".song-card");
 
-    wrappers.forEach(wrapper => {
-        const audio = wrapper.querySelector("audio");
-        const canvas = wrapper.querySelector(".wave-overlay");
-        if (!audio || !canvas) return;
+    cards.forEach(card => {
+        const audio = card.querySelector("audio");
+        const playBtn = card.querySelector(".play-btn");
+        const timeLabel = card.querySelector(".time-label");
+        const canvas = card.querySelector(".wave-canvas");
+        const waveContainer = card.querySelector(".wave-container");
 
-        // Ajustar canvas al tamaño del audio
+        if (!audio || !playBtn || !timeLabel || !canvas || !waveContainer) return;
+
+        // Asegurarnos que el canvas encaje en el contenedor
         const resizeCanvas = () => {
-            canvas.width = wrapper.clientWidth;
-            canvas.height = wrapper.clientHeight;
+            canvas.width = waveContainer.clientWidth;
+            canvas.height = waveContainer.clientHeight;
         };
         resizeCanvas();
         window.addEventListener("resize", resizeCanvas);
 
-        // limpiar animaciones previas si había
-        stopWave(audio);
+        // Actualizar duración cuando carga
+        audio.addEventListener("loadedmetadata", () => {
+            timeLabel.textContent = `0:00 / ${formatTime(audio.duration)}`;
+        });
 
-        // Eventos
-        audio.addEventListener("play", () => {
-            // parar otras ondas
-            document.querySelectorAll(".player-wrapper audio").forEach(a => {
-                if (a !== audio) stopWave(a);
+        // Actualizar tiempo actual (texto)
+        audio.addEventListener("timeupdate", () => {
+            timeLabel.textContent = `${formatTime(audio.currentTime)} / ${formatTime(audio.duration)}`;
+        });
+
+        // Clic en el botón play / pause
+        playBtn.addEventListener("click", async () => {
+            // Pausar otros audios
+            document.querySelectorAll(".song-card audio").forEach(a => {
+                if (a !== audio) {
+                    a.pause();
+                    stopWave(a);
+                }
             });
-            startWave(audio, canvas);
+            document.querySelectorAll(".play-btn").forEach(btn => {
+                if (btn !== playBtn) btn.textContent = "▶";
+            });
+
+            if (audio.paused) {
+                try {
+                    await audio.play();
+                    playBtn.textContent = "⏸";
+                    startWave(audio, canvas);
+                } catch (err) {
+                    console.error(err);
+                }
+            } else {
+                audio.pause();
+                playBtn.textContent = "▶";
+                stopWave(audio);
+            }
         });
 
-        audio.addEventListener("pause", () => {
-            stopWave(audio);
+        // Clic en la onda para adelantar/retroceder
+        waveContainer.addEventListener("click", (e) => {
+            const rect = waveContainer.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const percent = clickX / rect.width;
+            if (!isNaN(audio.duration)) {
+                audio.currentTime = percent * audio.duration;
+            }
         });
 
+        // Cuando termine, paramos animación y reseteamos botón
         audio.addEventListener("ended", () => {
+            playBtn.textContent = "▶";
             stopWave(audio);
         });
     });
 }
 
-// Iniciar animación de onda "fake" RGB sincronizada con el tiempo
+// ---------- Onda "fake" RGB sincronizada con el tiempo ----------
 function startWave(audio, canvas) {
-    stopWave(audio); // por si acaso
+    stopWave(audio); // limpiar si había una anterior
 
     function draw() {
         if (audio.paused || audio.ended) {
@@ -144,9 +197,9 @@ function startWave(audio, canvas) {
         const duration = audio.duration || 1;
         const progress = now / duration;
 
-        // Color RGB suave basado en el tiempo
+        // Color RGB suave basado en tiempo
         const hue = (now * 40) % 360;
-        ctx.strokeStyle = `hsl(${hue}, 80%, 65%)`;
+        ctx.strokeStyle = `hsl(hue, 80%, 65%)`.replace("hue", hue.toString());
         ctx.lineWidth = 2;
 
         ctx.beginPath();
@@ -158,14 +211,11 @@ function startWave(audio, canvas) {
         for (let i = 0; i <= segments; i++) {
             const t = (i / segments) * Math.PI * 2;
 
-            // base de onda
-            let base = Math.sin(t * 2 + now * 3);
-
-            // un poquito de pulso con el progreso
+            // base de onda + pequeño pulso
+            const base = Math.sin(t * 2 + now * 3);
             const pulse = Math.sin(progress * Math.PI * 4 + i * 0.3);
 
             const amplitude = (base * 0.4 + pulse * 0.2) * (height * 0.35);
-
             const y = height / 2 + amplitude;
 
             if (i === 0) ctx.moveTo(x, y);
@@ -184,7 +234,6 @@ function startWave(audio, canvas) {
     waveAnimations.set(audio, id);
 }
 
-// Parar la animación de una onda
 function stopWave(audio) {
     const id = waveAnimations.get(audio);
     if (id) {
@@ -193,9 +242,10 @@ function stopWave(audio) {
     }
 }
 
-// Init
+// ---------- Init ----------
 loadSongs();
 setupSearch();
+
 
 
 
